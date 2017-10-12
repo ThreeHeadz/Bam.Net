@@ -3727,7 +3727,7 @@ namespace Bam.Net
                         }
                         else if (valueType == typeof(Dictionary<object, object>))
                         {
-                            string childTypeName = "{0}{1}"._Format(typeName, propertyName);
+                            string childTypeName = "{0}_{1}"._Format(typeName, propertyName);
                             Type childType = ((Dictionary<object, object>)value).ToDynamicType(childTypeName, ++recursionThusFar, false);
                             createdTypes.Add(childType);
                             AddPropertyToDynamicType(typeBuilder, propertyName, childType);
