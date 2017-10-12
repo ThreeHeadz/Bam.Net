@@ -83,12 +83,17 @@ namespace Bam.Net.Data.Dynamic
         /// <returns></returns>
         protected DynamicTypeDescriptor SaveTypeDescriptor(string typeName, Dictionary<object, object> valueDictionary)
         {
-            DynamicTypeDescriptor descriptor = new DynamicTypeDescriptor()
+            DynamicTypeDescriptor descriptor = Repository.Query<DynamicTypeDescriptor>(td => td.TypeName == typeName).FirstOrDefault();
+            if(descriptor == null)
             {
-                TypeName = typeName,
-                Properties = new List<DynamicTypePropertyDescriptor>()
-            };
+                descriptor = new DynamicTypeDescriptor()
+                {
+                    TypeName = typeName,
+                    Properties = new List<DynamicTypePropertyDescriptor>()
+                };
+            }
             descriptor = Repository.Save(descriptor);
+
             Type type = valueDictionary.ToDynamicType(typeName, false);
             foreach (PropertyInfo prop in type.GetProperties())
             {
