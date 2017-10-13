@@ -8,9 +8,11 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Bam.Net.Data.Repositories;
 
 namespace Bam.Net.Data.Dynamic.Tests
 {
+
     [Serializable]
     public class DynamicRepositoryTests: CommandLineTestInterface
     {

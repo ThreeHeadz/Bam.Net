@@ -13,26 +13,28 @@ using System.Reflection;
 
 namespace Bam.Net.Data.Dynamic
 {
-    public class DynamicRepository : ICrudProvider
-    {        
-        public DynamicRepository(Repository descriptorRepository)
+    public class DynamicRepository : FsRepository
+    {
+        public DynamicRepository(DaoRepository descriptorRepository, DataSettings settings) : base(settings)
         {
-            FileProcessor = new BackgroundThreadQueue<FileInfo>()
+            FileProcessor = new BackgroundThreadQueue<DataFile>()
             {
-                Process = (fi) =>
+                Process = (df) =>
                 {
-
+                    ProcessJsonFile(df.TypeName, df.FileInfo);
                 }
             };
         }
-        public Repository Repository { get; set; }
+        public DaoRepository Repository { get; set; }
         public DirectoryInfo JsonDirectory { get; set; }
-        public BackgroundThreadQueue<FileInfo> FileProcessor { get; }
-        public void SaveJson(string json)
+        public BackgroundThreadQueue<DataFile> FileProcessor { get; }
+        protected override string DataDirectoryName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+        public void SaveJson(string typeName, string json)
         {
             string filePath = Path.Combine(JsonDirectory.FullName, $"{json.Sha1()}.json").GetNextFileName();
             json.SafeWriteToFile(filePath);
-            FileProcessor.Enqueue(new FileInfo(filePath));
+            FileProcessor.Enqueue(new DataFile { FileInfo = new FileInfo(filePath), TypeName = typeName });
         }
 
         protected void ProcessJsonFile(string typeName, FileInfo jsonFile)
@@ -46,11 +48,11 @@ namespace Bam.Net.Data.Dynamic
             SaveTypeDescriptor(typeName, valueDictionary);
             // 2. save data
             SaveDataInstance(typeName, dataSha1, valueDictionary);
-            
+
             foreach (object key in valueDictionary.Keys)
             {
                 object value = valueDictionary[key];
-                if(value != null)
+                if (value != null)
                 {
                     Type childType = value.GetType();
                     // 3. for each property where the type is JObject
@@ -65,10 +67,12 @@ namespace Bam.Net.Data.Dynamic
                     // 4. for each property where the type is JArray
                     //      foreach object in jarray
                     //          - repeat from 1
-                    else if(childType == typeof(JArray))
+                    else if (childType == typeof(JArray))
                     {
-                        // test how best to access values of JArray
-                        throw new NotImplementedException();
+                        foreach (JObject obj in (JArray)value)
+                        {
+
+                        }
                     }
                 }
             }
@@ -83,23 +87,15 @@ namespace Bam.Net.Data.Dynamic
         /// <returns></returns>
         protected DynamicTypeDescriptor SaveTypeDescriptor(string typeName, Dictionary<object, object> valueDictionary)
         {
-            DynamicTypeDescriptor descriptor = Repository.Query<DynamicTypeDescriptor>(td => td.TypeName == typeName).FirstOrDefault();
-            if(descriptor == null)
-            {
-                descriptor = new DynamicTypeDescriptor()
-                {
-                    TypeName = typeName,
-                    Properties = new List<DynamicTypePropertyDescriptor>()
-                };
-            }
-            descriptor = Repository.Save(descriptor);
+            DynamicTypeDescriptor descriptor = EnsureDescriptor(typeName);
 
             Type type = valueDictionary.ToDynamicType(typeName, false);
             foreach (PropertyInfo prop in type.GetProperties())
             {
-                descriptor.Properties.Add(new DynamicTypePropertyDescriptor { PropertyName = prop.Name });
+                SetDynamicTypePropertyDescriptor(descriptor.Id, new DynamicTypePropertyDescriptor { PropertyName = prop.Name });                
             }
-            return Repository.Save(descriptor);            
+
+            return Repository.Retrieve<DynamicTypeDescriptor>(descriptor.Id);
         }
         
         protected DataInstance SaveDataInstance(string typeName, string sha1, Dictionary<object, object> valueDictionary)
@@ -129,39 +125,80 @@ namespace Bam.Net.Data.Dynamic
             throw new NotImplementedException();
         }
 
-        public object Create(object toCreate)
+        protected override object PerformCreate(Type type, object toCreate)
         {
             throw new NotImplementedException();
         }
 
-        public bool Delete(object toDelete)
+        protected override bool PerformDelete(Type type, object toDelete)
         {
             throw new NotImplementedException();
         }
 
-        public IEnumerable<object> Query(Type type, Dictionary<string, object> queryParameters)
+        public override IEnumerable<T> Query<T>(Func<T, bool> query)
         {
             throw new NotImplementedException();
         }
 
-        public object Retrieve(Type objectType, string identifier)
+        public override IEnumerable<object> Query(Type type, Func<object, bool> predicate)
         {
             throw new NotImplementedException();
         }
 
-        public object Save(object toSave)
+        public override object Retrieve(Type objectType, long id)
         {
             throw new NotImplementedException();
         }
 
-        public IEnumerable SaveCollection(IEnumerable values)
+        public override object Retrieve(Type objectType, string uuid)
         {
             throw new NotImplementedException();
         }
 
-        public object Update(object toUpdate)
+        public override IEnumerable<object> RetrieveAll(Type type)
         {
             throw new NotImplementedException();
+        }
+
+        public override object Update(Type type, object toUpdate)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override bool Delete<T>(T toDelete)
+        {
+            throw new NotImplementedException();
+        }
+
+        object _typeDescriptorLock = new object();
+        private DynamicTypeDescriptor EnsureDescriptor(string typeName)
+        {
+            lock (_typeDescriptorLock)
+            {
+                DynamicTypeDescriptor descriptor = Repository.Query<DynamicTypeDescriptor>(td => td.TypeName == typeName).FirstOrDefault();
+                if (descriptor == null)
+                {
+                    descriptor = new DynamicTypeDescriptor()
+                    {
+                        TypeName = typeName
+                    };
+
+                    descriptor = Repository.Save(descriptor);
+                }
+                return descriptor;
+            }
+        }
+
+        private void SetDynamicTypePropertyDescriptor(long typeId, DynamicTypePropertyDescriptor prop)
+        {
+            DynamicTypePropertyDescriptor retrieved = Repository.Query<DynamicTypePropertyDescriptor>(
+                Filter.Where(nameof(DynamicTypePropertyDescriptor.PropertyName)) == prop.PropertyName &&
+                Filter.Where(nameof(DynamicTypePropertyDescriptor.DynamicTypeId)) == typeId
+            ).FirstOrDefault();
+            if(retrieved == null)
+            {
+                Repository.Save(new DynamicTypePropertyDescriptor { DynamicTypeId = typeId, PropertyName = prop.PropertyName });
+            }
         }
     }
 }

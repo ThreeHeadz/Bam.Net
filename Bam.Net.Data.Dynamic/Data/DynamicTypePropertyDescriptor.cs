@@ -13,5 +13,19 @@ namespace Bam.Net.Data.Dynamic.Data
         public long DynamicTypeId { get; set; }
         public virtual DynamicTypeDescriptor DynamicType { get; set; }
         public string PropertyName { get; set; }
+
+        public override int GetHashCode()
+        {
+            return $"{DynamicTypeId}:{PropertyName}".ToSha1Int();
+        }
+
+        public override bool Equals(object obj)
+        {
+            if(obj is DynamicTypePropertyDescriptor d)
+            {
+                return d.DynamicTypeId == DynamicTypeId && d.PropertyName.Equals(PropertyName);
+            }
+            return false;
+        }
     }
 }

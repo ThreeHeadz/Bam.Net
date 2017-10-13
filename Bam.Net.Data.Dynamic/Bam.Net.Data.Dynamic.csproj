@@ -52,11 +52,32 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.Web.Infrastructure.1.0.0.0\lib\net40\Microsoft.Web.Infrastructure.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Mvc, Version=5.2.3.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.Mvc.5.2.3\lib\net45\System.Web.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.Razor.3.2.3\lib\net45\System.Web.Razor.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Deployment, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Deployment.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -65,10 +86,41 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DaoAssemblyGenerator.cs" />
+    <Compile Include="DataFile.cs" />
     <Compile Include="Data\DataInstance.cs" />
     <Compile Include="Data\DataInstancePropertyValue.cs" />
     <Compile Include="Data\DynamicTypePropertyDescriptor.cs" />
     <Compile Include="Data\DynamicTypeDescriptor.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstance.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstanceCollection.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstanceColumns.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePagedQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValue.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValueCollection.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValueColumns.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValuePagedQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValueQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstancePropertyValueWrapper.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstanceQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DataInstanceWrapper.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDataContext.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDataRepository.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptor.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptorCollection.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptorColumns.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptorPagedQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptorQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypeDescriptorWrapper.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptor.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptorCollection.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptorColumns.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptorPagedQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptorQuery.cs" />
+    <Compile Include="Data\Generated_Dao\DynamicTypePropertyDescriptorWrapper.cs" />
+    <Compile Include="Data\Generated_Dao\Qi\DataInstance.cs" />
+    <Compile Include="Data\Generated_Dao\Qi\DataInstancePropertyValue.cs" />
+    <Compile Include="Data\Generated_Dao\Qi\DynamicTypeDescriptor.cs" />
+    <Compile Include="Data\Generated_Dao\Qi\DynamicTypePropertyDescriptor.cs" />
     <Compile Include="DynamicDatabase.cs" />
     <Compile Include="DynamicRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -123,6 +175,7 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
+    <None Include="regen_data_dynamic_dao.cmd" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
