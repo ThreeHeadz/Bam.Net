@@ -49,6 +49,20 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
                 return new DynamicTypePropertyDescriptorColumns("DynamicTypeId");
             }
         }
+        public DynamicTypePropertyDescriptorColumns ParentTypeName
+        {
+            get
+            {
+                return new DynamicTypePropertyDescriptorColumns("ParentTypeName");
+            }
+        }
+        public DynamicTypePropertyDescriptorColumns PropertyType
+        {
+            get
+            {
+                return new DynamicTypePropertyDescriptorColumns("PropertyType");
+            }
+        }
         public DynamicTypePropertyDescriptorColumns PropertyName
         {
             get

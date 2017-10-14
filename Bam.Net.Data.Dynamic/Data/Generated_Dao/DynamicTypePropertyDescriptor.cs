@@ -115,6 +115,34 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		}
 	}
 
+	// property:ParentTypeName, columnName:ParentTypeName	
+	[Bam.Net.Data.Column(Name="ParentTypeName", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string ParentTypeName
+	{
+		get
+		{
+			return GetStringValue("ParentTypeName");
+		}
+		set
+		{
+			SetValue("ParentTypeName", value);
+		}
+	}
+
+	// property:PropertyType, columnName:PropertyType	
+	[Bam.Net.Data.Column(Name="PropertyType", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string PropertyType
+	{
+		get
+		{
+			return GetStringValue("PropertyType");
+		}
+		set
+		{
+			SetValue("PropertyType", value);
+		}
+	}
+
 	// property:PropertyName, columnName:PropertyName	
 	[Bam.Net.Data.Column(Name="PropertyName", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
 	public string PropertyName

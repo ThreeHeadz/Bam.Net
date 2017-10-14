@@ -42,11 +42,25 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
                 return new DataInstancePropertyValueColumns("Cuid");
             }
         }
-        public DataInstancePropertyValueColumns DocumentHash
+        public DataInstancePropertyValueColumns RootHash
         {
             get
             {
-                return new DataInstancePropertyValueColumns("DocumentHash");
+                return new DataInstancePropertyValueColumns("RootHash");
+            }
+        }
+        public DataInstancePropertyValueColumns InstanceHash
+        {
+            get
+            {
+                return new DataInstancePropertyValueColumns("InstanceHash");
+            }
+        }
+        public DataInstancePropertyValueColumns ParentTypeName
+        {
+            get
+            {
+                return new DataInstancePropertyValueColumns("ParentTypeName");
             }
         }
         public DataInstancePropertyValueColumns PropertyName

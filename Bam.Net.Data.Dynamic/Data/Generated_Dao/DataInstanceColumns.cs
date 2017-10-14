@@ -49,11 +49,25 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
                 return new DataInstanceColumns("TypeName");
             }
         }
-        public DataInstanceColumns DocumentHash
+        public DataInstanceColumns RootHash
         {
             get
             {
-                return new DataInstanceColumns("DocumentHash");
+                return new DataInstanceColumns("RootHash");
+            }
+        }
+        public DataInstanceColumns ParentHash
+        {
+            get
+            {
+                return new DataInstanceColumns("ParentHash");
+            }
+        }
+        public DataInstanceColumns Instancehash
+        {
+            get
+            {
+                return new DataInstanceColumns("Instancehash");
             }
         }
         public DataInstanceColumns Created

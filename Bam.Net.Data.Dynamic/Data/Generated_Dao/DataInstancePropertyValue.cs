@@ -101,17 +101,45 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		}
 	}
 
-	// property:DocumentHash, columnName:DocumentHash	
-	[Bam.Net.Data.Column(Name="DocumentHash", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
-	public string DocumentHash
+	// property:RootHash, columnName:RootHash	
+	[Bam.Net.Data.Column(Name="RootHash", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string RootHash
 	{
 		get
 		{
-			return GetStringValue("DocumentHash");
+			return GetStringValue("RootHash");
 		}
 		set
 		{
-			SetValue("DocumentHash", value);
+			SetValue("RootHash", value);
+		}
+	}
+
+	// property:InstanceHash, columnName:InstanceHash	
+	[Bam.Net.Data.Column(Name="InstanceHash", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string InstanceHash
+	{
+		get
+		{
+			return GetStringValue("InstanceHash");
+		}
+		set
+		{
+			SetValue("InstanceHash", value);
+		}
+	}
+
+	// property:ParentTypeName, columnName:ParentTypeName	
+	[Bam.Net.Data.Column(Name="ParentTypeName", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string ParentTypeName
+	{
+		get
+		{
+			return GetStringValue("ParentTypeName");
+		}
+		set
+		{
+			SetValue("ParentTypeName", value);
 		}
 	}
 

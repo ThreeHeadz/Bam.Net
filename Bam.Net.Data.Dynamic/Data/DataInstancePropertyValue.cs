@@ -12,7 +12,9 @@ namespace Bam.Net.Data.Dynamic.Data
     {
         public long DataInstanceId { get; set; }
         public virtual DataInstance DataInstance { get; set; }
-        public string DocumentHash { get; set; }
+        public string RootHash { get; set; }
+        public string InstanceHash { get; set; }
+        public string ParentTypeName { get; set; }
         public string PropertyName { get; set; }
         public virtual object Value { get; set; }
     }

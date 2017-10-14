@@ -11,19 +11,21 @@ namespace Bam.Net.Data.Dynamic.Data
     public class DynamicTypePropertyDescriptor: RepoData
     {
         public long DynamicTypeId { get; set; }
-        public virtual DynamicTypeDescriptor DynamicType { get; set; }
+        public virtual DynamicTypeDescriptor ParentType { get; set; }
+        public string ParentTypeName { get; set; }
+        public string PropertyType { get; set; }
         public string PropertyName { get; set; }
 
         public override int GetHashCode()
         {
-            return $"{DynamicTypeId}:{PropertyName}".ToSha1Int();
+            return $"{DynamicTypeId}:{ParentTypeName}:{PropertyType}:{PropertyName}".ToSha1Int();
         }
 
         public override bool Equals(object obj)
         {
             if(obj is DynamicTypePropertyDescriptor d)
             {
-                return d.DynamicTypeId == DynamicTypeId && d.PropertyName.Equals(PropertyName);
+                return d.GetHashCode() == GetHashCode();
             }
             return false;
         }

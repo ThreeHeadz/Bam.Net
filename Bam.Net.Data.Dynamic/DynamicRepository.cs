@@ -19,8 +19,8 @@ namespace Bam.Net.Data.Dynamic
         public DynamicRepository(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(settings)
         {
             descriptorRepository.EnsureDaoAssemblyAndSchema();
-            Repository = descriptorRepository;
-            FileProcessor = new BackgroundThreadQueue<DataFile>()
+            DynamicTypeDataRepository = descriptorRepository;
+            JsonFileProcessor = new BackgroundThreadQueue<DataFile>()
             {
                 Process = (df) =>
                 {
@@ -28,69 +28,38 @@ namespace Bam.Net.Data.Dynamic
                 }
             };
         }
-        public DynamicTypeDataRepository Repository { get; set; }
+        public DynamicTypeDataRepository DynamicTypeDataRepository { get; set; }
         public DirectoryInfo JsonDirectory { get; set; }
-        public BackgroundThreadQueue<DataFile> FileProcessor { get; }
+        public BackgroundThreadQueue<DataFile> JsonFileProcessor { get; }
         protected override string DataDirectoryName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public void SaveJson(string typeName, string json)
         {
             string filePath = Path.Combine(JsonDirectory.FullName, $"{json.Sha1()}.json").GetNextFileName();
             json.SafeWriteToFile(filePath);
-            FileProcessor.Enqueue(new DataFile { FileInfo = new FileInfo(filePath), TypeName = typeName });
+            JsonFileProcessor.Enqueue(new DataFile { FileInfo = new FileInfo(filePath), TypeName = typeName });
         }
 
         protected void ProcessJsonFile(string typeName, FileInfo jsonFile)
         {
             // read the json
             string json = jsonFile.ReadAllText();
-            string dataSha1 = json.Sha1();
+            string rootHash = json.Sha1();
             JObject jobj = (JObject)JsonConvert.DeserializeObject(json);
             Dictionary<object, object> valueDictionary = jobj.ToObject<Dictionary<object, object>>();
-            SaveData(dataSha1, typeName, valueDictionary);
+            SaveRootData(rootHash, typeName, valueDictionary);
         }
-
-        protected void SaveData(string dataSha1, string typeName, Dictionary<object, object> valueDictionary)
+ 
+        protected void SaveRootData(string rootHash, string typeName, Dictionary<object, object> valueDictionary)
         {
             // 1. save parent descriptor
             SaveTypeDescriptor(typeName, valueDictionary);
             // 2. save data
-            SaveDataInstance(dataSha1, typeName, valueDictionary);
-
-            foreach (object key in valueDictionary.Keys)
-            {
-                object value = valueDictionary[key];
-                if (value != null)
-                {
-                    Type childType = value.GetType();
-                    string childTypeName = $"{typeName}_{key}";
-                    // 3. for each property where the type is JObject
-                    //      - repeat from 1
-                    if (childType == typeof(JObject))
-                    {
-                        Dictionary<object, object> childValueDictionary = ((JObject)value).ToObject<Dictionary<object, object>>();
-                        SaveTypeDescriptor(childTypeName, childValueDictionary);
-                        SaveDataInstance(dataSha1, childTypeName, childValueDictionary);
-                    }
-                    // 4. for each property where the type is JArray
-                    //      foreach object in jarray
-                    //          - repeat from 1
-                    else if (childType == typeof(JArray))
-                    {
-                        foreach (JObject obj in (JArray)value)
-                        {
-                            Dictionary<object, object> childData = obj.ToObject<Dictionary<object, object>>();
-                            SaveTypeDescriptor(childTypeName, childData);
-                            SaveDataInstance(dataSha1, childTypeName, childData);
-                        }
-                    }
-                }
-            }
+            SaveDataInstance(rootHash, typeName, valueDictionary);            
         }
 
         /// <summary>
-        /// Save the primitive property types in the specified
-        /// JObject as the specified typeName
+        /// Save a DynamicTypeDescriptor for the specified values
         /// </summary>
         /// <param name="typeName"></param>
         /// <param name="valueDictionary"></param>
@@ -99,35 +68,101 @@ namespace Bam.Net.Data.Dynamic
         {
             DynamicTypeDescriptor descriptor = EnsureDescriptor(typeName);
 
-            Type type = valueDictionary.ToDynamicType(typeName, false);
-            foreach (PropertyInfo prop in type.GetProperties())
+            foreach (object key in valueDictionary.Keys)
             {
-                SetDynamicTypePropertyDescriptor(descriptor.Id, new DynamicTypePropertyDescriptor { PropertyName = prop.Name });                
+                object value = valueDictionary[key];
+                if (value != null)
+                {
+                    Type childType = value.GetType();
+                    string childTypeName = $"{typeName}.{key}";
+                    if (childType == typeof(JObject))
+                    {
+                        SetDynamicTypePropertyDescriptor(new DynamicTypePropertyDescriptor
+                        {
+                            DynamicTypeId = descriptor.Id,
+                            ParentTypeName = descriptor.TypeName,
+                            PropertyName = key.ToString(),
+                            PropertyType = childTypeName
+                        });
+                    }
+                    else if (childType == typeof(JArray))
+                    {
+                        SetDynamicTypePropertyDescriptor(new DynamicTypePropertyDescriptor
+                        {
+                            DynamicTypeId = descriptor.Id,
+                            ParentTypeName = descriptor.TypeName,
+                            PropertyName = key.ToString(),
+                            PropertyType = $"arrayOf({childTypeName})"
+                        });
+                    } 
+                }
             }
 
-            return Repository.Retrieve<DynamicTypeDescriptor>(descriptor.Id);
+            return DynamicTypeDataRepository.Retrieve<DynamicTypeDescriptor>(descriptor.Id);
         }
-        
-        protected DataInstance SaveDataInstance(string originalDocumentHash, string typeName, Dictionary<object, object> valueDictionary)
+        protected DataInstance SaveDataInstance(string rootHash, string typeName, Dictionary<object, object> valueDictionary)
         {
-            DataInstance data = new DataInstance
+            return SaveDataInstance(rootHash, rootHash, typeName, valueDictionary);
+        }
+        static Dictionary<string, object> _parentLocks = new Dictionary<string, object>();
+        protected DataInstance SaveDataInstance(string rootHash, string parentHash, string typeName, Dictionary<object, object> valueDictionary)
+        {
+            string instanceHash = valueDictionary.ToJson().Sha1();
+            DataInstance data = DynamicTypeDataRepository.DataInstancesWhere(di => di.RootHash == rootHash && di.ParentHash == parentHash && di.TypeName == typeName).FirstOrDefault();
+            if(data == null)
             {
-                TypeName = typeName,
-                DocumentHash = originalDocumentHash,
-                Properties = new List<DataInstancePropertyValue>()
-            };
-            data = Repository.Save(data);
-            Type dynamicType = valueDictionary.ToDynamicType(typeName, true);
-            foreach(PropertyInfo prop in dynamicType.GetProperties())
-            {
-                data.Properties.Add(new DataInstancePropertyValue { PropertyName = prop.Name, Value = valueDictionary[prop.Name] });
+                _parentLocks.AddMissing(parentHash, new object());
+                lock (_parentLocks[parentHash])
+                {
+                    data = DynamicTypeDataRepository.Save(new DataInstance
+                    {
+                        TypeName = typeName,
+                        RootHash = rootHash,
+                        ParentHash = parentHash,
+                        Properties = new List<DataInstancePropertyValue>()
+                    });
+                }
             }
-            return Repository.Save(data);
-        }
+            
+            foreach(object key in valueDictionary.Keys)
+            {
+                object value = valueDictionary[key];
+                if (value != null)
+                {
+                    Type childType = value.GetType();
+                    string childTypeName = $"{typeName}.{key}";
+                    // 3. for each property where the type is JObject
+                    //      - repeat from 1
+                    if (childType == typeof(JObject))
+                    {
+                        SaveJObjectData(childTypeName, rootHash, instanceHash, (JObject)value);
+                    }
+                    // 4. for each property where the type is JArray
+                    //      foreach object in jarray
+                    //          - repeat from 1
+                    else if (childType == typeof(JArray))
+                    {
+                        foreach (JObject obj in (JArray)value)
+                        {
+                            SaveJObjectData(childTypeName, rootHash, instanceHash, obj);
+                        }
+                    }
+                    else
+                    {
+                        data.Properties.Add(new DataInstancePropertyValue
+                                                {
+                                                    RootHash = rootHash,
+                                                    InstanceHash = instanceHash,
+                                                    ParentTypeName = typeName,
+                                                    PropertyName = key.ToString(),
+                                                    Value = value
+                                                }
+                                            );
+                    }
+                }
+            }
 
-        public object[] TypesFromYaml(string yaml)
-        {
-            throw new NotImplementedException();
+            return DynamicTypeDataRepository.Save(data);
         }
 
         public void SaveData(object[] data)
@@ -185,7 +220,7 @@ namespace Bam.Net.Data.Dynamic
         {
             lock (_typeDescriptorLock)
             {
-                DynamicTypeDescriptor descriptor = Repository.Query<DynamicTypeDescriptor>(td => td.TypeName == typeName).FirstOrDefault();
+                DynamicTypeDescriptor descriptor = DynamicTypeDataRepository.Query<DynamicTypeDescriptor>(td => td.TypeName == typeName).FirstOrDefault();
                 if (descriptor == null)
                 {
                     descriptor = new DynamicTypeDescriptor()
@@ -193,22 +228,36 @@ namespace Bam.Net.Data.Dynamic
                         TypeName = typeName
                     };
 
-                    descriptor = Repository.Save(descriptor);
+                    descriptor = DynamicTypeDataRepository.Save(descriptor);
                 }
                 return descriptor;
             }
         }
 
-        private void SetDynamicTypePropertyDescriptor(long typeId, DynamicTypePropertyDescriptor prop)
+        static Dictionary<int, object> _dynamicTypePropertyLocks = new Dictionary<int, object>();
+        private void SetDynamicTypePropertyDescriptor(DynamicTypePropertyDescriptor prop)
         {
-            DynamicTypePropertyDescriptor retrieved = Repository.Query<DynamicTypePropertyDescriptor>(
-                Filter.Where(nameof(DynamicTypePropertyDescriptor.PropertyName)) == prop.PropertyName &&
-                Filter.Where(nameof(DynamicTypePropertyDescriptor.DynamicTypeId)) == typeId
-            ).FirstOrDefault();
-            if(retrieved == null)
+            int hashCode = prop.GetHashCode();
+            _dynamicTypePropertyLocks.AddMissing(hashCode, new object());
+            lock (_dynamicTypePropertyLocks[hashCode])
             {
-                Repository.Save(new DynamicTypePropertyDescriptor { DynamicTypeId = typeId, PropertyName = prop.PropertyName });
+                DynamicTypePropertyDescriptor retrieved = DynamicTypeDataRepository.DynamicTypePropertyDescriptorsWhere(pd =>
+                    pd.DynamicTypeId == prop.DynamicTypeId &&
+                    pd.ParentTypeName == prop.ParentTypeName &&
+                    pd.PropertyType == prop.PropertyType &&
+                    pd.PropertyName == prop.PropertyName).FirstOrDefault();
+
+                if (retrieved == null)
+                {
+                    DynamicTypeDataRepository.Save(prop);
+                }
             }
+        }
+        private void SaveJObjectData(string typeName, string rootHash, string parentHash, JObject value)
+        {
+            Dictionary<object, object> childValueDictionary = value.ToObject<Dictionary<object, object>>();
+            SaveTypeDescriptor(typeName, childValueDictionary);
+            SaveDataInstance(rootHash, parentHash, typeName, childValueDictionary);
         }
     }
 }
