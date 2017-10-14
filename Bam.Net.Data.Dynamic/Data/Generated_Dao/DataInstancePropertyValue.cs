@@ -101,6 +101,20 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		}
 	}
 
+	// property:DocumentHash, columnName:DocumentHash	
+	[Bam.Net.Data.Column(Name="DocumentHash", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string DocumentHash
+	{
+		get
+		{
+			return GetStringValue("DocumentHash");
+		}
+		set
+		{
+			SetValue("DocumentHash", value);
+		}
+	}
+
 	// property:PropertyName, columnName:PropertyName	
 	[Bam.Net.Data.Column(Name="PropertyName", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
 	public string PropertyName
@@ -112,6 +126,20 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		set
 		{
 			SetValue("PropertyName", value);
+		}
+	}
+
+	// property:Created, columnName:Created	
+	[Bam.Net.Data.Column(Name="Created", DbDataType="DateTime", MaxLength="8", AllowNull=true)]
+	public DateTime? Created
+	{
+		get
+		{
+			return GetDateTimeValue("Created");
+		}
+		set
+		{
+			SetValue("Created", value);
 		}
 	}
 

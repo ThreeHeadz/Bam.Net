@@ -9,6 +9,8 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Bam.Net.Data.Repositories;
+using Bam.Net.Data.Dynamic.Data.Dao.Repository;
+using Bam.Net.Data.Dynamic.Data;
 
 namespace Bam.Net.Data.Dynamic.Tests
 {
@@ -47,15 +49,57 @@ namespace Bam.Net.Data.Dynamic.Tests
             }
         }
 
+        public class TestDynamicRepository: DynamicRepository
+        {
+            public TestDynamicRepository(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(descriptorRepository, settings)
+            {
+            }
+
+            public void TestSaveTypDescriptor(string typeName, Dictionary<object, object> data)
+            {
+                SaveTypeDescriptor(typeName, data);
+            }
+            public void TestSaveData(string sha1, string typeName, Dictionary<object, object> data)
+            {
+                SaveData(sha1, typeName, data);
+            }
+        }
+
         // save descriptor
         [UnitTest]
-        public void SaveDescriptorTest()
+        public void SaveDescriptorDoesntDuplicte()
         {
-            JObject jobj = (JObject)JsonConvert.DeserializeObject("\\\\core\\data\\events\\github\\24745fe6efe498f79b3b165be27b1feb69a851d0.json".SafeReadFile());
-            Dictionary<object, object> dic = jobj.ToObject<Dictionary<object, object>>();
-
+            TestDynamicRepository testRepo = new TestDynamicRepository(new DynamicTypeDataRepository(), DataSettings.Default);            
+            JObject jobj = (JObject)JsonConvert.DeserializeObject(new { Name = "some name", Arr = new object[] { new { Fromage = "gooey" } } }.ToJson());
+            Dictionary<object, object> data = jobj.ToObject<Dictionary<object, object>>();
+            string testTypeName = "test_typeName";
+            testRepo.Repository.DeleteWhere<DynamicTypeDescriptor>(new { TypeName = testTypeName });
+            DynamicTypeDescriptor descriptor = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.TypeName == testTypeName).FirstOrDefault();
+            Expect.IsNull(descriptor);
+            testRepo.TestSaveTypDescriptor(testTypeName, data);
+            int count = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.TypeName == testTypeName).Count();
+            Expect.IsTrue(count == 1);
+            testRepo.TestSaveTypDescriptor(testTypeName, data);
+            count = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.TypeName == testTypeName).Count();
+            Expect.IsTrue(count == 1);
         }
         // save child descriptors
+        [UnitTest]
+        public void SaveDataSavesTypes()
+        {
+            TestDynamicRepository testRepo = new TestDynamicRepository(new DynamicTypeDataRepository(), DataSettings.Default);
+            JObject jobj = (JObject)JsonConvert.DeserializeObject(new { Name = "some name", Arr = new object[] { new { Fromage = "gooey" } } }.ToJson());
+            Dictionary<object, object> data = jobj.ToObject<Dictionary<object, object>>();
+            string testTypeName = "test_typeName";
+            List<DynamicTypeDescriptor> descriptors = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.Id > 0).ToList();
+            descriptors.Each(d => testRepo.Repository.Delete(d));
+            DynamicTypeDescriptor descriptor = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.TypeName == testTypeName).FirstOrDefault();
+            Expect.IsNull(descriptor);
+            testRepo.TestSaveData("sha1NotUsedForThisTest", testTypeName, data);
+            descriptors = testRepo.Repository.DynamicTypeDescriptorsWhere(d => d.Id > 0).ToList();
+            Expect.IsTrue(descriptors.Count == 2);
+            descriptors.Each(d => OutLineFormat("{0}: {1}", d.Id, d.TypeName, ConsoleColor.Cyan));
+        }
         // save data
         // save child data
     }

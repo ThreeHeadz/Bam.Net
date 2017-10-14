@@ -118,17 +118,17 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		}
 	}
 
-	// property:DataId, columnName:DataId	
-	[Bam.Net.Data.Column(Name="DataId", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
-	public string DataId
+	// property:DocumentHash, columnName:DocumentHash	
+	[Bam.Net.Data.Column(Name="DocumentHash", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string DocumentHash
 	{
 		get
 		{
-			return GetStringValue("DataId");
+			return GetStringValue("DocumentHash");
 		}
 		set
 		{
-			SetValue("DataId", value);
+			SetValue("DocumentHash", value);
 		}
 	}
 

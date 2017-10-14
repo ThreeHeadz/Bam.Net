@@ -14,7 +14,7 @@ namespace Bam.Net.Data.Dynamic.Data
         /// <summary>
         /// The Sha1 of the original json or yaml data
         /// </summary>
-        public string DataId { get; set; }
+        public string DocumentHash { get; set; }
         public virtual List<DataInstancePropertyValue> Properties { get; set; }
     }
 }

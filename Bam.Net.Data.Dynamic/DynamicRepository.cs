@@ -10,13 +10,16 @@ using Bam.Net.Data.Dynamic.Data;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Reflection;
+using Bam.Net.Data.Dynamic.Data.Dao.Repository;
 
 namespace Bam.Net.Data.Dynamic
 {
     public class DynamicRepository : FsRepository
     {
-        public DynamicRepository(DaoRepository descriptorRepository, DataSettings settings) : base(settings)
+        public DynamicRepository(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(settings)
         {
+            descriptorRepository.EnsureDaoAssemblyAndSchema();
+            Repository = descriptorRepository;
             FileProcessor = new BackgroundThreadQueue<DataFile>()
             {
                 Process = (df) =>
@@ -25,7 +28,7 @@ namespace Bam.Net.Data.Dynamic
                 }
             };
         }
-        public DaoRepository Repository { get; set; }
+        public DynamicTypeDataRepository Repository { get; set; }
         public DirectoryInfo JsonDirectory { get; set; }
         public BackgroundThreadQueue<DataFile> FileProcessor { get; }
         protected override string DataDirectoryName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
@@ -44,10 +47,15 @@ namespace Bam.Net.Data.Dynamic
             string dataSha1 = json.Sha1();
             JObject jobj = (JObject)JsonConvert.DeserializeObject(json);
             Dictionary<object, object> valueDictionary = jobj.ToObject<Dictionary<object, object>>();
+            SaveData(dataSha1, typeName, valueDictionary);
+        }
+
+        protected void SaveData(string dataSha1, string typeName, Dictionary<object, object> valueDictionary)
+        {
             // 1. save parent descriptor
             SaveTypeDescriptor(typeName, valueDictionary);
             // 2. save data
-            SaveDataInstance(typeName, dataSha1, valueDictionary);
+            SaveDataInstance(dataSha1, typeName, valueDictionary);
 
             foreach (object key in valueDictionary.Keys)
             {
@@ -55,14 +63,14 @@ namespace Bam.Net.Data.Dynamic
                 if (value != null)
                 {
                     Type childType = value.GetType();
+                    string childTypeName = $"{typeName}_{key}";
                     // 3. for each property where the type is JObject
                     //      - repeat from 1
                     if (childType == typeof(JObject))
                     {
-                        string childTypeName = $"{typeName}_{key}";
                         Dictionary<object, object> childValueDictionary = ((JObject)value).ToObject<Dictionary<object, object>>();
                         SaveTypeDescriptor(childTypeName, childValueDictionary);
-                        SaveDataInstance(childTypeName, dataSha1, childValueDictionary);
+                        SaveDataInstance(dataSha1, childTypeName, childValueDictionary);
                     }
                     // 4. for each property where the type is JArray
                     //      foreach object in jarray
@@ -71,7 +79,9 @@ namespace Bam.Net.Data.Dynamic
                     {
                         foreach (JObject obj in (JArray)value)
                         {
-
+                            Dictionary<object, object> childData = obj.ToObject<Dictionary<object, object>>();
+                            SaveTypeDescriptor(childTypeName, childData);
+                            SaveDataInstance(dataSha1, childTypeName, childData);
                         }
                     }
                 }
@@ -98,12 +108,12 @@ namespace Bam.Net.Data.Dynamic
             return Repository.Retrieve<DynamicTypeDescriptor>(descriptor.Id);
         }
         
-        protected DataInstance SaveDataInstance(string typeName, string sha1, Dictionary<object, object> valueDictionary)
+        protected DataInstance SaveDataInstance(string originalDocumentHash, string typeName, Dictionary<object, object> valueDictionary)
         {
             DataInstance data = new DataInstance
             {
                 TypeName = typeName,
-                DataId = sha1,
+                DocumentHash = originalDocumentHash,
                 Properties = new List<DataInstancePropertyValue>()
             };
             data = Repository.Save(data);
