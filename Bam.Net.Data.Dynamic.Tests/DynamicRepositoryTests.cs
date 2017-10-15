@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using Bam.Net.Data.Repositories;
 using Bam.Net.Data.Dynamic.Data.Dao.Repository;
 using Bam.Net.Data.Dynamic.Data;
+using Bam.Net.Testing.Integration;
+using System.Threading;
 
 namespace Bam.Net.Data.Dynamic.Tests
 {
@@ -49,9 +51,9 @@ namespace Bam.Net.Data.Dynamic.Tests
             }
         }
 
-        public class TestDynamicRepository: DynamicRepository
+        public class TestDynamicTypeManager: DynamicTypeManager
         {
-            public TestDynamicRepository(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(descriptorRepository, settings)
+            public TestDynamicTypeManager(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(descriptorRepository, settings)
             {
             }
 
@@ -69,7 +71,7 @@ namespace Bam.Net.Data.Dynamic.Tests
         [UnitTest]
         public void SaveDescriptorDoesntDuplicte()
         {
-            TestDynamicRepository testRepo = new TestDynamicRepository(new DynamicTypeDataRepository(), DataSettings.Default);            
+            TestDynamicTypeManager testRepo = new TestDynamicTypeManager(new DynamicTypeDataRepository(), DataSettings.Default);            
             JObject jobj = (JObject)JsonConvert.DeserializeObject(new { Name = "some name", Arr = new object[] { new { Fromage = "gooey" } } }.ToJson());
             Dictionary<object, object> data = jobj.ToObject<Dictionary<object, object>>();
             string testTypeName = "test_typeName";
@@ -90,7 +92,7 @@ namespace Bam.Net.Data.Dynamic.Tests
         public void SaveDataSavesTypes()
         {
             string testTypeName = nameof(SaveDataSavesTypes).RandomLetters(5);
-            SetupTestData(testTypeName, out TestDynamicRepository testRepo, out Dictionary<object, object> data);
+            SetupTestData(out TestDynamicTypeManager testRepo, out Dictionary<object, object> data);
 
             // Test
             testRepo.TestSaveData("sha1NotUsedForThisTest", testTypeName, data);
@@ -104,7 +106,7 @@ namespace Bam.Net.Data.Dynamic.Tests
         public void SaveDataSavesInstance()
         {
             string testTypeName = nameof(SaveDataSavesInstance).RandomLetters(5);
-            SetupTestData(testTypeName, out TestDynamicRepository testRepo, out Dictionary<object, object> data);
+            SetupTestData(out TestDynamicTypeManager testRepo, out Dictionary<object, object> data);
 
             testRepo.TestSaveData("sha1NotUsedForThisTest", testTypeName, data);
             List<DataInstance> datas = testRepo.DynamicTypeDataRepository.DataInstancesWhere(d => d.TypeName == testTypeName).ToList();
@@ -112,12 +114,23 @@ namespace Bam.Net.Data.Dynamic.Tests
             Expect.IsTrue(datas[0].TypeName.Equals(testTypeName));
             datas[0].Properties.Each(p => OutLine($"{p.PropertyName} = {p.Value}"));
         }
-        // save child data
+        
+        [UnitTest]
+        [IntegrationTest]
+        public void SaveRealData()
+        {
+            AutoResetEvent wait = new AutoResetEvent(false);
+            string json = "\\\\core\\data\\events\\github\\04feeb057e9eba4a6ace6413af475f819b54ad0c.json".SafeReadFile();
+            DynamicTypeManager typeManager = new DynamicTypeManager(new DynamicTypeDataRepository(), DataSettings.Default);
+            typeManager.SaveJson("GitHubEvent", json);
+            typeManager.JsonFileProcessor.QueueEmptied += (s, a) => wait.Set();
+            OutLine(typeManager.DynamicTypeDataRepository.Database.ConnectionString);            
+            wait.WaitOne();
+        }
 
-        private static void SetupTestData(string typeName, out TestDynamicRepository repo, out Dictionary<object, object> data)
+        private static void SetupTestData(out TestDynamicTypeManager repo, out Dictionary<object, object> data)
         {
             // setup test data
-            TestDynamicRepository testRepo = new TestDynamicRepository(new DynamicTypeDataRepository(), DataSettings.Default);
             JObject jobj = (JObject)JsonConvert.DeserializeObject(new
             {
                 Name = "some name",
@@ -126,7 +139,7 @@ namespace Bam.Net.Data.Dynamic.Tests
                     Name = "child name",
                     ChildProp = "only child has this"
                 },
-                ChildArrProp = new object[] 
+                ChildArrProp = new object[]
                 {
                     new
                     {
@@ -136,16 +149,23 @@ namespace Bam.Net.Data.Dynamic.Tests
             }.ToJson());
 
             data = jobj.ToObject<Dictionary<object, object>>();
+            repo = GetTestDynamicTypeManager();
+        }
 
+        private static TestDynamicTypeManager GetTestDynamicTypeManager()
+        {
+            TestDynamicTypeManager repo;
             // clear existing entries if any
+            TestDynamicTypeManager testRepo = new TestDynamicTypeManager(new DynamicTypeDataRepository(), DataSettings.Default);
             testRepo.DynamicTypeDataRepository.DynamicTypeDescriptorsWhere(d => d.Id > 0).Each(d => testRepo.DynamicTypeDataRepository.Delete(d));
             testRepo.DynamicTypeDataRepository.DataInstancesWhere(d => d.Id > 0).Each(d => testRepo.DynamicTypeDataRepository.Delete(d));
-            
+
             // make sure the type isn't in the repo 
-            DynamicTypeDescriptor descriptor = testRepo.DynamicTypeDataRepository.DynamicTypeDescriptorsWhere(d => d.TypeName == typeName).FirstOrDefault();
+            DynamicTypeDescriptor descriptor = testRepo.DynamicTypeDataRepository.DynamicTypeDescriptorsWhere(d => d.Id > 0).FirstOrDefault();
             Expect.IsNull(descriptor);
 
             repo = testRepo;
+            return repo;
         }
     }
 }

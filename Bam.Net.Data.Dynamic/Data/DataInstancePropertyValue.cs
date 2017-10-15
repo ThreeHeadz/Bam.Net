@@ -16,6 +16,6 @@ namespace Bam.Net.Data.Dynamic.Data
         public string InstanceHash { get; set; }
         public string ParentTypeName { get; set; }
         public string PropertyName { get; set; }
-        public virtual object Value { get; set; }
+        public string Value { get; set; }
     }
 }

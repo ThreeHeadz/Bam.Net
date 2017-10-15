@@ -14,10 +14,16 @@ using Bam.Net.Data.Dynamic.Data.Dao.Repository;
 
 namespace Bam.Net.Data.Dynamic
 {
-    public class DynamicRepository : FsRepository
+    public class DynamicTypeManager 
     {
-        public DynamicRepository(DynamicTypeDataRepository descriptorRepository, DataSettings settings) : base(settings)
+        public DynamicTypeManager(DynamicTypeDataRepository descriptorRepository, DataSettings settings) 
         {
+            DataSettings = settings;
+            JsonDirectory = settings.GetDataDirectory(nameof(DynamicTypeManager));
+            if (!JsonDirectory.Exists)
+            {
+                JsonDirectory.Create();
+            }
             descriptorRepository.EnsureDaoAssemblyAndSchema();
             DynamicTypeDataRepository = descriptorRepository;
             JsonFileProcessor = new BackgroundThreadQueue<DataFile>()
@@ -28,10 +34,10 @@ namespace Bam.Net.Data.Dynamic
                 }
             };
         }
+        public DataSettings DataSettings { get; set; }
         public DynamicTypeDataRepository DynamicTypeDataRepository { get; set; }
         public DirectoryInfo JsonDirectory { get; set; }
         public BackgroundThreadQueue<DataFile> JsonFileProcessor { get; }
-        protected override string DataDirectoryName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public void SaveJson(string typeName, string json)
         {
@@ -75,26 +81,43 @@ namespace Bam.Net.Data.Dynamic
                 {
                     Type childType = value.GetType();
                     string childTypeName = $"{typeName}.{key}";
-                    if (childType == typeof(JObject))
+                    DynamicTypePropertyDescriptor propertyDescriptor = new DynamicTypePropertyDescriptor
                     {
-                        SetDynamicTypePropertyDescriptor(new DynamicTypePropertyDescriptor
+                        DynamicTypeId = descriptor.Id,
+                        ParentTypeName = descriptor.TypeName,
+                        PropertyName = key.ToString(),
+                    };
+
+                    if (childType == typeof(JObject) || childType == typeof(Dictionary<object, object>))
+                    {
+                        propertyDescriptor.PropertyType = childTypeName;
+                        SetDynamicTypePropertyDescriptor(propertyDescriptor);
+                        Dictionary<object, object> data = value as Dictionary<object, object>;
+                        if(data is null)
                         {
-                            DynamicTypeId = descriptor.Id,
-                            ParentTypeName = descriptor.TypeName,
-                            PropertyName = key.ToString(),
-                            PropertyType = childTypeName
-                        });
+                            data = ((JObject)value).ToObject<Dictionary<object, object>>();
+                        }
+                        SaveTypeDescriptor(childTypeName, data);
                     }
-                    else if (childType == typeof(JArray))
+                    else if (childType == typeof(JArray) || childType.IsArray)
                     {
-                        SetDynamicTypePropertyDescriptor(new DynamicTypePropertyDescriptor
+                        propertyDescriptor.PropertyType = $"arrayOf({childTypeName})";
+                        SetDynamicTypePropertyDescriptor(propertyDescriptor);
+
+                        foreach (object obj in (IEnumerable)value)
                         {
-                            DynamicTypeId = descriptor.Id,
-                            ParentTypeName = descriptor.TypeName,
-                            PropertyName = key.ToString(),
-                            PropertyType = $"arrayOf({childTypeName})"
-                        });
-                    } 
+                            Dictionary<object, object> data = new Dictionary<object, object>();
+                            if(obj is JObject jobj)
+                            {
+                                data = jobj.ToObject<Dictionary<object, object>>();
+                                SaveTypeDescriptor(childTypeName, data);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        SetDynamicTypePropertyDescriptor(propertyDescriptor);
+                    }
                 }
             }
 
@@ -142,22 +165,35 @@ namespace Bam.Net.Data.Dynamic
                     //          - repeat from 1
                     else if (childType == typeof(JArray))
                     {
-                        foreach (JObject obj in (JArray)value)
+                        foreach (object obj in (JArray)value)
                         {
-                            SaveJObjectData(childTypeName, rootHash, instanceHash, obj);
+                            if(obj is JObject jobj)
+                            {
+                                SaveJObjectData(childTypeName, rootHash, instanceHash, jobj);
+                            }
+                            else
+                            {
+                                data.Properties.Add(new DataInstancePropertyValue
+                                {
+                                    RootHash = rootHash,
+                                    InstanceHash = instanceHash,
+                                    ParentTypeName = typeName,
+                                    PropertyName = key.ToString(),
+                                    Value = obj.ToString()
+                                });
+                            }                           
                         }
                     }
                     else
                     {
                         data.Properties.Add(new DataInstancePropertyValue
-                                                {
-                                                    RootHash = rootHash,
-                                                    InstanceHash = instanceHash,
-                                                    ParentTypeName = typeName,
-                                                    PropertyName = key.ToString(),
-                                                    Value = value
-                                                }
-                                            );
+                        {
+                            RootHash = rootHash,
+                            InstanceHash = instanceHash,
+                            ParentTypeName = typeName,
+                            PropertyName = key.ToString(),
+                            Value = value.ToString()
+                        });
                     }
                 }
             }
@@ -165,56 +201,7 @@ namespace Bam.Net.Data.Dynamic
             return DynamicTypeDataRepository.Save(data);
         }
 
-        public void SaveData(object[] data)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override object PerformCreate(Type type, object toCreate)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override bool PerformDelete(Type type, object toDelete)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override IEnumerable<T> Query<T>(Func<T, bool> query)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override IEnumerable<object> Query(Type type, Func<object, bool> predicate)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override object Retrieve(Type objectType, long id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override object Retrieve(Type objectType, string uuid)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override IEnumerable<object> RetrieveAll(Type type)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override object Update(Type type, object toUpdate)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override bool Delete<T>(T toDelete)
-        {
-            throw new NotImplementedException();
-        }
-
+        
         object _typeDescriptorLock = new object();
         private DynamicTypeDescriptor EnsureDescriptor(string typeName)
         {
@@ -255,9 +242,14 @@ namespace Bam.Net.Data.Dynamic
         }
         private void SaveJObjectData(string typeName, string rootHash, string parentHash, JObject value)
         {
-            Dictionary<object, object> childValueDictionary = value.ToObject<Dictionary<object, object>>();
-            SaveTypeDescriptor(typeName, childValueDictionary);
-            SaveDataInstance(rootHash, parentHash, typeName, childValueDictionary);
+            Dictionary<object, object> valueDictionary = value.ToObject<Dictionary<object, object>>();
+            SaveObjectData(typeName, rootHash, parentHash, valueDictionary);
+        }
+
+        private void SaveObjectData(string typeName, string rootHash, string parentHash, Dictionary<object, object> valueDictionary)
+        {
+            SaveTypeDescriptor(typeName, valueDictionary);
+            SaveDataInstance(rootHash, parentHash, typeName, valueDictionary);
         }
     }
 }

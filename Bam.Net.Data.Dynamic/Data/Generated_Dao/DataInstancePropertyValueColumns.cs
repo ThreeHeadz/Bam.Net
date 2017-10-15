@@ -70,6 +70,13 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
                 return new DataInstancePropertyValueColumns("PropertyName");
             }
         }
+        public DataInstancePropertyValueColumns Value
+        {
+            get
+            {
+                return new DataInstancePropertyValueColumns("Value");
+            }
+        }
         public DataInstancePropertyValueColumns Created
         {
             get

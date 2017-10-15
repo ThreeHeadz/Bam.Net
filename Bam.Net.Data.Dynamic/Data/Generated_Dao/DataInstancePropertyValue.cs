@@ -157,6 +157,20 @@ namespace Bam.Net.Data.Dynamic.Data.Dao
 		}
 	}
 
+	// property:Value, columnName:Value	
+	[Bam.Net.Data.Column(Name="Value", DbDataType="VarChar", MaxLength="4000", AllowNull=true)]
+	public string Value
+	{
+		get
+		{
+			return GetStringValue("Value");
+		}
+		set
+		{
+			SetValue("Value", value);
+		}
+	}
+
 	// property:Created, columnName:Created	
 	[Bam.Net.Data.Column(Name="Created", DbDataType="DateTime", MaxLength="8", AllowNull=true)]
 	public DateTime? Created
